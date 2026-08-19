@@ -92,17 +92,16 @@ const server = http.createServer((req, res) => {
 
   let contentType = mimeTypes[extname] || 'application/octet-stream';
 
-fs.readFile(filePath, (error, content) => {
+  fs.readFile(filePath, (error, content) => {
     if (error) {
       fs.readFile(path.join(__dirname, 'public', 'index.html'), (err, fallback) => {
         res.writeHead(200, {
           'Content-Type': 'text/html; charset=utf-8',
           'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate'
         });
-        res.end(fallback, 'utf-8');
+        res.end(fallback || '', 'utf-8');
       });
     } else {
-      // Never cache HTML or Service Worker; allow short cache for heavy static assets
       const isDynamic = extname === '.html' || filePath.endsWith('service-worker.js');
       const cacheControl = isDynamic
         ? 'no-store, no-cache, must-revalidate, proxy-revalidate'
@@ -115,6 +114,7 @@ fs.readFile(filePath, (error, content) => {
       res.end(content, 'utf-8');
     }
   });
+});
 
 // --- WEBSOCKET ENGINE ---
 const wss = new WebSocketServer({ server });
