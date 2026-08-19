@@ -198,25 +198,25 @@
 
     /* In-Game HUD */
     .hud { width: 100%; max-width: 550px; display: flex; flex-direction: column; gap: 4px; padding: 5px 10px; background: var(--card-bg); border-radius: 8px; flex-shrink: 0; }
+    
     .hud-top { 
       display: flex; 
       justify-content: space-between; 
       align-items: center; 
       font-weight: 700; 
       font-size: 0.95rem; 
-      position: relative;
+      gap: 6px;
     }
-    .hud-left { display: flex; align-items: center; gap: 6px; }
-    .hud-right { display: flex; align-items: center; gap: 8px; }
+    
+    .hud-left { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    .hud-center { display: flex; align-items: center; justify-content: center; flex: 1; min-width: 0; overflow: visible; }
+    .hud-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    
     .btn-quit { background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; color: #fca5a5; font-size: 0.7rem; font-weight: 700; padding: 2px 7px; border-radius: 5px; cursor: pointer; }
     .btn-quit:active { transform: scale(0.95); background: var(--danger); color: white; }
 
-    /* Centered HUD Streak / Combo Badge */
+    /* Centered HUD Streak / Combo Badge (Auto-dimming & Non-overlapping) */
     .streak-badge {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%) scale(0);
       background: linear-gradient(135deg, #ef4444, #f59e0b);
       color: #fff;
       padding: 2px 10px;
@@ -225,14 +225,14 @@
       font-weight: 900;
       letter-spacing: 0.5px;
       box-shadow: 0 2px 10px rgba(239, 68, 68, 0.5);
-      z-index: 5;
-      transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s;
+      transform: scale(0);
+      transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.25s;
       pointer-events: none;
       opacity: 0;
       white-space: nowrap;
     }
     .streak-badge.active {
-      transform: translate(-50%, -50%) scale(1);
+      transform: scale(1);
       opacity: 1;
     }
 
@@ -534,8 +534,12 @@
         </button>
         <div class="timer" id="timer">⏱️ 05:00</div>
       </div>
-      <!-- Center Aligned Streak / Combo Badge in the top HUD row -->
-      <div id="streak-badge" class="streak-badge">🔥 2x COMBO</div>
+      
+      <!-- Non-overlapping Center Slot for Streak Badge -->
+      <div class="hud-center">
+        <div id="streak-badge" class="streak-badge">🔥 2x COMBO</div>
+      </div>
+
       <div class="hud-right">
         <div class="score" id="score">Score: 0</div>
       </div>
@@ -597,6 +601,9 @@
       },
       steal: () => {
         if (navigator.vibrate) navigator.vibrate([55, 40, 55]);
+      },
+      tick: () => {
+        if (navigator.vibrate) navigator.vibrate(18);
       },
       victory: () => {
         if (navigator.vibrate) navigator.vibrate([60, 70, 60, 70, 120]);
@@ -729,8 +736,11 @@
         playPunchyTone({ freq: 90, type: 'square', duration: 0.25, gainVal: 0.4 });
       },
 
+      // High-Impact Punchy Clock Countdown Sound (Low-kick punch + sharp resonant click)
       tick: () => {
-        playPunchyTone({ freq: 950, type: 'triangle', duration: 0.04, gainVal: 0.28 });
+        playPunchyTone({ freq: 140, type: 'sawtooth', duration: 0.09, gainVal: 0.55, pitchDecay: 0.05 });
+        playPunchyTone({ freq: 1150, type: 'square', duration: 0.05, gainVal: 0.38, pitchDecay: 0.02 });
+        haptics.tick();
       },
 
       streakChime: () => {
@@ -752,11 +762,11 @@
       }
     };
 
-    // --- MP3 BGM ENGINE ---
+    // --- MP3 BGM ENGINE WITH AUTOPLAY ---
     const bgmAudio = new Audio('/bgm.mp3');
     bgmAudio.loop = true;
     bgmAudio.volume = 0.42;
-    let isMusicPlaying = false;
+    let isMusicPlaying = true; // Auto-play enabled by default
 
     function playBgm() {
       bgmAudio.play()
@@ -764,7 +774,9 @@
           isMusicPlaying = true;
           updateMusicUI(true);
         })
-        .catch(() => {});
+        .catch(() => {
+          // Browser prevented unprompted autoplay; will resume on first touch
+        });
     }
 
     function toggleBgm() {
@@ -806,9 +818,15 @@
       }
     }
 
-    window.addEventListener('click', () => {
+    // Try auto-play immediately on load
+    window.addEventListener('load', () => {
+      playBgm();
+    });
+
+    // Fallback listener: starts BGM on the very first user interaction
+    window.addEventListener('pointerdown', () => {
       getAudioContext();
-      if (!isMusicPlaying && bgmAudio.paused) {
+      if (isMusicPlaying && bgmAudio.paused) {
         playBgm();
       }
     }, { once: true });
@@ -914,8 +932,10 @@
       setTimeout(() => el.remove(), 950);
     }
 
-    // --- STREAK COUNTER ENGINE ---
+    // --- STREAK COUNTER ENGINE (WITH AUTO-DISMISS) ---
     let streakCount = 0;
+    let streakTimeout = null;
+
     function registerStreakSuccess() {
       streakCount++;
       const badge = document.getElementById('streak-badge');
@@ -923,10 +943,18 @@
         badge.textContent = `🔥 ${streakCount}x STREAK!`;
         badge.classList.add('active');
         if (streakCount >= 3) sfx.streakChime();
+        
+        // Auto-dismiss streak badge after 2.2 seconds
+        if (streakTimeout) clearTimeout(streakTimeout);
+        streakTimeout = setTimeout(() => {
+          badge.classList.remove('active');
+        }, 2200);
       }
     }
+
     function resetStreak() {
       streakCount = 0;
+      if (streakTimeout) clearTimeout(streakTimeout);
       document.getElementById('streak-badge').classList.remove('active');
     }
 
@@ -1121,7 +1149,7 @@
     }
 
     function startSolo(mode) {
-      if (!isMusicPlaying) playBgm();
+      if (isMusicPlaying && bgmAudio.paused) playBgm();
       currentMode = `SOLO_${mode}`;
       connectWS(() => {
         ws.send(JSON.stringify({ type: 'C2S_START_SOLO', payload: { mode } }));
@@ -1129,7 +1157,7 @@
     }
 
     function findMatch(mode) {
-      if (!isMusicPlaying) playBgm();
+      if (isMusicPlaying && bgmAudio.paused) playBgm();
       currentMode = `DUEL_${mode}`;
       showScreen('searching-screen');
       connectWS(() => {
@@ -1138,7 +1166,7 @@
     }
 
     function createPrivateRoom(mode = 'TIMED') {
-      if (!isMusicPlaying) playBgm();
+      if (isMusicPlaying && bgmAudio.paused) playBgm();
       currentMode = `PRIVATE_${mode}`;
       connectWS(() => {
         ws.send(JSON.stringify({ type: 'C2S_CREATE_PRIVATE', payload: { mode } }));
@@ -1146,7 +1174,7 @@
     }
 
     function joinPrivateRoom(code) {
-      if (!isMusicPlaying) playBgm();
+      if (isMusicPlaying && bgmAudio.paused) playBgm();
       connectWS(() => {
         ws.send(JSON.stringify({ type: 'C2S_JOIN_PRIVATE', payload: { code } }));
       });
@@ -1537,6 +1565,7 @@
         const secs = String(Math.max(0, timeLeft) % 60).padStart(2, '0');
         timerEl.textContent = `⏱️ ${mins}:${secs}`;
 
+        // Punchy tension countdown in the final 15 seconds
         if (timeLeft <= 15 && timeLeft > 0) {
           timerEl.classList.add('urgent');
           sfx.tick();
