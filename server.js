@@ -86,7 +86,8 @@ const server = http.createServer((req, res) => {
     '.css': 'text/css; charset=utf-8',
     '.json': 'application/json; charset=utf-8',
     '.png': 'image/png',
-    '.svg': 'image/svg+xml'
+    '.svg': 'image/svg+xml',
+    '.mp3': 'audio/mpeg'
   };
 
   let contentType = mimeTypes[extname] || 'application/octet-stream';

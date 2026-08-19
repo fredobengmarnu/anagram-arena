@@ -1,9 +1,10 @@
-const CACHE_NAME = 'anagram-arena-v7';
+const CACHE_NAME = 'anagram-arena-v8';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/definitions.json'
+  '/definitions.json',
+  '/bgm.mp3'
 ];
 
 self.addEventListener('install', (event) => {
