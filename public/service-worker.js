@@ -1,4 +1,4 @@
-const CACHE_NAME = 'anagram-arena-v8';
+const CACHE_NAME = 'anagram-arena-v9';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
